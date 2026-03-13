@@ -1,0 +1,11 @@
+.venv
+output/
+bin/
+build/
+dist/
+__pycache__
+.DS_Store
+ffmpeg*
+changes.txt
+TEMP
+settings.json
