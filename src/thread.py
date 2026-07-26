@@ -1,6 +1,7 @@
 import json
 import subprocess
 import os
+import re
 import src.globals as g
 from math import ceil, floor
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -157,10 +158,104 @@ Encoder: {encoder_type}
             else:
                 cmd_args.extend(["-pass 2", f'"{output_path}"'])
 
-            cmd = " ".join(cmd_args)
-            print(f"Running command: {cmd}")
+            # Build argument list for subprocess (avoid a shell and quoted strings)
+            # cmd_args currently contains individual arg strings; some may include
+            # items like '"{path}"' or combined flags. Normalize into a list.
+            normalized = []
+            for a in cmd_args:
+                # strip outer quotes if present
+                if a.startswith('"') and a.endswith('"'):
+                    normalized.append(a[1:-1])
+                else:
+                    # split combined args like '-c:v libx264' into two
+                    if " " in a and not a.startswith('-'):
+                        normalized.extend(a.split())
+                    else:
+                        parts = a.split()
+                        normalized.extend(parts)
+
+            # Prevent creating a console window on Windows
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
             self.update_log.emit(status_msg)
-            self.process = subprocess.check_call(cmd, shell=False)
+
+            try:
+                # Start ffmpeg and capture stderr (ffmpeg prints progress to stderr)
+                self.process = subprocess.Popen(
+                    normalized,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    creationflags=creationflags,
+                )
+
+                # Get total duration to compute percentage progress
+                total_duration = get_video_length(file_path)
+
+                # Read stderr lines and parse progress indicators
+                for line in self.process.stderr:
+                    if not line:
+                        continue
+                    line = line.strip()
+
+                    # Parse fps
+                    fps_match = re.search(r"fps=\s*([0-9.]+)", line)
+                    fps = fps_match.group(1) if fps_match else None
+
+                    # Parse speed (e.g. 1.23x)
+                    speed_match = re.search(r"speed=\s*([0-9.]+x)", line)
+                    speed = speed_match.group(1) if speed_match else None
+
+                    # Parse time (HH:MM:SS.xxx)
+                    time_match = re.search(r"time=\s*([0-9:.]+)", line)
+                    elapsed_seconds = None
+                    if time_match:
+                        t = time_match.group(1)
+                        parts = t.split(':')
+                        try:
+                            if len(parts) == 3:
+                                h, m, s = parts
+                                elapsed_seconds = float(h) * 3600 + float(m) * 60 + float(s)
+                            elif len(parts) == 2:
+                                m, s = parts
+                                elapsed_seconds = float(m) * 60 + float(s)
+                            else:
+                                elapsed_seconds = float(parts[0])
+                        except Exception:
+                            elapsed_seconds = None
+
+                    # Compute combined progress across queue and passes
+                    total_steps = len(g.queue) * passes
+                    current_step = (len(g.completed) * passes) + i
+                    base_progress = (current_step / total_steps) * 100 if total_steps > 0 else 0
+
+                    additional = 0
+                    if elapsed_seconds is not None and total_duration > 0:
+                        # each pass for a single file accounts for 1/total_steps of overall work
+                        additional = (elapsed_seconds / total_duration) * (1.0 / total_steps) * 100
+
+                    overall_progress = min(100, base_progress + additional)
+
+                    # Build a small progress snippet for the UI
+                    prog_snip = ""
+                    if fps:
+                        prog_snip += f"FPS: {fps}  "
+                    if speed:
+                        prog_snip += f"Speed: {speed}  "
+                    if elapsed_seconds is not None:
+                        prog_snip += f"Elapsed: {elapsed_seconds:.1f}s"
+
+                    # Emit UI updates
+                    if prog_snip:
+                        self.update_log.emit(prog_snip)
+                    self.update_progress.emit(int(overall_progress))
+
+                rc = self.process.wait()
+                if rc != 0:
+                    self.update_log.emit(f"ffmpeg exited with code {rc}")
+
+            except Exception as e:
+                self.update_log.emit(f"Error running ffmpeg: {e}")
 
     def run(self):
         g.completed = []
