@@ -127,7 +127,7 @@ class Window(QWidget):
         self.checkbox_one_pass.setChecked(self.settings["one_pass"])
 
         # Shutdown Label
-        self.label_shutdown = QLabel("Shutdown", self)
+        self.label_shutdown = QLabel("Shutdown after done", self)
         self.label_shutdown.resize(SHUTDOWN_LABEL.w, SHUTDOWN_LABEL.h)
         self.label_shutdown.move(SHUTDOWN_LABEL.x, SHUTDOWN_LABEL.y)
 

@@ -2,6 +2,7 @@ import json
 import subprocess
 import os
 import re
+import time
 import src.globals as g
 from math import ceil, floor
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -185,6 +186,7 @@ Encoder: {encoder_type}
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                     text=True,
+                    bufsize=1,
                     creationflags=creationflags,
                 )
 
@@ -192,10 +194,15 @@ Encoder: {encoder_type}
                 total_duration = get_video_length(file_path)
 
                 # Read stderr lines and parse progress indicators
+                stderr_errors = []
                 for line in self.process.stderr:
                     if not line:
                         continue
                     line = line.strip()
+                    if not line:
+                        continue
+                    if line == "progress=continue" or line == "progress=end":
+                        continue
 
                     # Parse fps
                     fps_match = re.search(r"fps=\s*([0-9.]+)", line)
@@ -205,8 +212,8 @@ Encoder: {encoder_type}
                     speed_match = re.search(r"speed=\s*([0-9.]+x)", line)
                     speed = speed_match.group(1) if speed_match else None
 
-                    # Parse time (HH:MM:SS.xxx)
-                    time_match = re.search(r"time=\s*([0-9:.]+)", line)
+                    # Parse time (HH:MM:SS.xxx) - matches both "time=" and "out_time="
+                    time_match = re.search(r"(?:out_)?time=\s*([0-9:.]+)", line)
                     elapsed_seconds = None
                     if time_match:
                         t = time_match.group(1)
@@ -223,6 +230,13 @@ Encoder: {encoder_type}
                         except Exception:
                             elapsed_seconds = None
 
+                    has_progress = fps_match or speed_match or time_match
+
+                    # Show non-progress stderr lines (warnings/errors)
+                    if not has_progress:
+                        stderr_errors.append(line)
+                        continue
+
                     # Compute combined progress across queue and passes
                     total_steps = len(g.queue) * passes
                     current_step = (len(g.completed) * passes) + i
@@ -237,12 +251,15 @@ Encoder: {encoder_type}
 
                     # Build a small progress snippet for the UI
                     prog_snip = ""
+                    if time_match:
+                        prog_snip += f"Time: {time_match.group(1)}  "
+                    elapsed = time.time() - self.start_time
+                    elapsed_str = f"{int(elapsed // 60):02d}:{int(elapsed % 60):02d}"
+                    prog_snip += f"Elapsed: {elapsed_str}  "
                     if fps:
                         prog_snip += f"FPS: {fps}  "
                     if speed:
                         prog_snip += f"Speed: {speed}  "
-                    if time_match:
-                        prog_snip += f"Time: {time_match.group(1)}  "
 
                     # Emit UI updates
                     if prog_snip:
@@ -251,12 +268,15 @@ Encoder: {encoder_type}
 
                 rc = self.process.wait()
                 if rc != 0:
+                    if stderr_errors:
+                        self.update_log.emit("\n".join(stderr_errors))
                     self.update_log.emit(f"ffmpeg exited with code {rc}")
 
             except Exception as e:
                 self.update_log.emit(f"Error running ffmpeg: {e}")
 
     def run(self):
+        self.start_time = time.time()
         g.completed = []
 
         for file_path in g.queue:
