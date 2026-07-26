@@ -163,16 +163,15 @@ Encoder: {encoder_type}
             # items like '"{path}"' or combined flags. Normalize into a list.
             normalized = []
             for a in cmd_args:
-                # strip outer quotes if present
                 if a.startswith('"') and a.endswith('"'):
                     normalized.append(a[1:-1])
                 else:
-                    # split combined args like '-c:v libx264' into two
-                    if " " in a and not a.startswith('-'):
-                        normalized.extend(a.split())
-                    else:
-                        parts = a.split()
-                        normalized.extend(parts)
+                    parts = a.split()
+                    for part in parts:
+                        if part.startswith('"') and part.endswith('"'):
+                            normalized.append(part[1:-1])
+                        else:
+                            normalized.append(part)
 
             # Prevent creating a console window on Windows
             creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -183,7 +182,7 @@ Encoder: {encoder_type}
                 # Start ffmpeg and capture stderr (ffmpeg prints progress to stderr)
                 self.process = subprocess.Popen(
                     normalized,
-                    stdout=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
                     stderr=subprocess.PIPE,
                     text=True,
                     creationflags=creationflags,
@@ -242,8 +241,8 @@ Encoder: {encoder_type}
                         prog_snip += f"FPS: {fps}  "
                     if speed:
                         prog_snip += f"Speed: {speed}  "
-                    if elapsed_seconds is not None:
-                        prog_snip += f"Elapsed: {elapsed_seconds:.1f}s"
+                    if time_match:
+                        prog_snip += f"Time: {time_match.group(1)}  "
 
                     # Emit UI updates
                     if prog_snip:
