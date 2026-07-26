@@ -1,7 +1,7 @@
 VERSION = "007"
 TITLE = f"CVC v{VERSION}"
 READY_TEXT = f"Select your videos to get started."
-DEFAULT_SETTINGS = {"target_percentage": 20, "use_gpu": False, "one_pass": False}
+DEFAULT_SETTINGS = {"target_percentage": 20, "use_gpu": False, "one_pass": False, "shutdown": False}
 
 ffmpeg_path = "ffmpeg"
 ffprobe_path = "ffprobe"

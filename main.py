@@ -3,6 +3,8 @@ import sys
 import os
 import os
 import psutil
+import platform
+import subprocess
 import src.globals as g
 from notifypy import Notify
 from src.download import DownloadThread
@@ -87,6 +89,8 @@ class Window(QWidget):
             self.settings["target_percentage"] = g.DEFAULT_SETTINGS["target_percentage"]
         if "one_pass" not in self.settings:
             self.settings["one_pass"] = g.DEFAULT_SETTINGS["one_pass"]
+        if "shutdown" not in self.settings:
+            self.settings["shutdown"] = g.DEFAULT_SETTINGS.get("shutdown", False)
 
         self.label_size = QLabel(f"Size: {self.settings['target_percentage']}%", self)
         self.label_size.resize(SIZE_PERCENT_LABEL.w, SIZE_PERCENT_LABEL.h)
@@ -122,6 +126,17 @@ class Window(QWidget):
         self.checkbox_one_pass.move(ONE_PASS_CHECKBOX.x, ONE_PASS_CHECKBOX.y)
         self.checkbox_one_pass.setChecked(self.settings["one_pass"])
 
+        # Shutdown Label
+        self.label_shutdown = QLabel("Shutdown", self)
+        self.label_shutdown.resize(SHUTDOWN_LABEL.w, SHUTDOWN_LABEL.h)
+        self.label_shutdown.move(SHUTDOWN_LABEL.x, SHUTDOWN_LABEL.y)
+
+        # Shutdown Checkbox
+        self.checkbox_shutdown = QCheckBox(self)
+        self.checkbox_shutdown.resize(SHUTDOWN_CHECKBOX.w, SHUTDOWN_CHECKBOX.h)
+        self.checkbox_shutdown.move(SHUTDOWN_CHECKBOX.x, SHUTDOWN_CHECKBOX.y)
+        self.checkbox_shutdown.setChecked(self.settings.get("shutdown", False))
+
         # Log Label
         self.label_log = QLabel(g.READY_TEXT, self)
         self.label_log.setEnabled(True)
@@ -146,6 +161,8 @@ class Window(QWidget):
         self.checkbox_one_pass.setStyleSheet(CHECKBOX_STYLE)
         self.label_gpu.setStyleSheet(LABEL_STYLE)
         self.checkbox_gpu.setStyleSheet(CHECKBOX_STYLE)
+        self.label_shutdown.setStyleSheet(LABEL_STYLE)
+        self.checkbox_shutdown.setStyleSheet(CHECKBOX_STYLE)
         self.label_log.setStyleSheet(LABEL_LOG_STYLE)
         self.progress_bar.setStyleSheet(PROGRESS_BAR_STYLE)
 
@@ -159,6 +176,7 @@ class Window(QWidget):
         self.settings["target_percentage"] = self.slider_size.value()
         self.settings["use_gpu"] = self.checkbox_gpu.isChecked()
         self.settings["one_pass"] = self.checkbox_one_pass.isChecked()
+        self.settings["shutdown"] = self.checkbox_shutdown.isChecked()
         save_settings(self.settings)
         kill_ffmpeg()
 
@@ -265,6 +283,14 @@ class Window(QWidget):
 
     def abort_compression(self):
         kill_ffmpeg()
+        # If a shutdown was scheduled, try to abort it
+        try:
+            if platform.system() == "Windows":
+                # cancel pending shutdown
+                subprocess.run(["shutdown", "/a"], check=False)
+        except Exception:
+            pass
+
         self.completed(True)
 
     def update_log(self, text):
@@ -298,6 +324,19 @@ class Window(QWidget):
 
         if not aborted:
             os.startfile(g.output_dir)
+            # If user requested shutdown after completion, schedule it (Windows only)
+            try:
+                if self.checkbox_shutdown.isChecked() and platform.system() == "Windows":
+                    # schedule system shutdown in 30 seconds
+                    subprocess.run(["shutdown", "/s", "/t", "30"], check=False)
+                    # notify user
+                    n2 = Notify()
+                    n2.title = "Shutting down"
+                    n2.message = "System will shutdown in 30 seconds."
+                    n2.icon = os.path.join(g.res_dir, "icon.ico")
+                    n2.send()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

@@ -191,6 +191,21 @@ ONE_PASS_CHECKBOX = Rect(
     25,
 )
 
+# Shutdown checkbox (placed below GPU/One-pass row)
+SHUTDOWN_LABEL = Rect(
+    H_GAP,
+    GPU_LABEL.y + GPU_LABEL.h + V_GAP,
+    110,
+    25,
+)
+
+SHUTDOWN_CHECKBOX = Rect(
+    SHUTDOWN_LABEL.x + SHUTDOWN_LABEL.w,
+    SHUTDOWN_LABEL.y,
+    25,
+    25,
+)
+
 PROGRESS_BAR = Rect(
     H_GAP,
     WINDOW.h - V_GAP - 25,
@@ -200,7 +215,7 @@ PROGRESS_BAR = Rect(
 
 LOG_AREA = Rect(
     H_GAP,
-    GPU_LABEL.y + GPU_LABEL.h + V_GAP,
+    SHUTDOWN_LABEL.y + SHUTDOWN_LABEL.h + V_GAP,
     WINDOW.w - (H_GAP * 2),
-    PROGRESS_BAR.y - (GPU_LABEL.y + GPU_LABEL.h + V_GAP * 2),
+    PROGRESS_BAR.y - (SHUTDOWN_LABEL.y + SHUTDOWN_LABEL.h + V_GAP * 2),
 )
