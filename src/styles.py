@@ -195,7 +195,7 @@ ONE_PASS_CHECKBOX = Rect(
 SHUTDOWN_LABEL = Rect(
     H_GAP,
     GPU_LABEL.y + GPU_LABEL.h + V_GAP,
-    110,
+    70,
     25,
 )
 
