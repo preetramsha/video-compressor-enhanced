@@ -287,7 +287,8 @@ class Window(QWidget):
         try:
             if platform.system() == "Windows":
                 # cancel pending shutdown
-                subprocess.run(["shutdown", "/a"], check=False)
+                creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                subprocess.run(["shutdown", "/a"], check=False, creationflags=creationflags)
         except Exception:
             pass
 
@@ -328,7 +329,8 @@ class Window(QWidget):
             try:
                 if self.checkbox_shutdown.isChecked() and platform.system() == "Windows":
                     # schedule system shutdown in 30 seconds
-                    subprocess.run(["shutdown", "/s", "/t", "30"], check=False)
+                    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    subprocess.run(["shutdown", "/s", "/t", "30"], check=False, creationflags=creationflags)
                     # notify user
                     n2 = Notify()
                     n2.title = "Shutting down"

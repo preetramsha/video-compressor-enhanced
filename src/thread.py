@@ -20,7 +20,8 @@ def get_video_length(file_path):
         file_path,
     ]
 
-    output = subprocess.check_output(cmd)
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    output = subprocess.check_output(cmd, creationflags=creationflags)
     data = json.loads(output)
 
     if "format" in data:
@@ -45,7 +46,8 @@ def get_audio_bitrate(video_path):
     ]
 
     # Run ffprobe and capture output
-    output = subprocess.check_output(cmd)
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    output = subprocess.check_output(cmd, creationflags=creationflags)
     data = json.loads(output)
 
     # Extract bitrate from JSON response
@@ -80,7 +82,10 @@ class CompressionThread(QThread):
     def detect_gpu_encoder(self):
         try:
             cmd = [g.ffmpeg_path, "-hide_banner", "-encoders"]
-            output = subprocess.check_output(cmd, universal_newlines=True)
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            output = subprocess.check_output(
+                cmd, universal_newlines=True, creationflags=creationflags
+            )
 
             if "h264_nvenc" in output:
                 return "h264_nvenc"
